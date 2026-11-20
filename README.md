@@ -8,10 +8,10 @@ Standard attention computes `softmax(Q Kᵀ / √d) V` by building an `N x N` sc
 
 ## How it works
 
-1. **Tiling** — each block owns a group of query rows and walks over K and V in small tiles held in fast shared memory.
-2. **Online softmax** — for each query row the kernel keeps a running maximum `m` and running sum `l`. When a new tile arrives it rescales the partial output by `exp(m_old − m_new)`. The final answer is exact, not an approximation.
-3. **No score matrix** — only the output `O` is allocated, so extra memory is `B·H·N·D·4` bytes.
-4. **Causal mask** (optional) — keys after the query are masked, and tiles beyond the diagonal are skipped.
+1. **Tiling**: each block owns a group of query rows and walks over K and V in small tiles held in fast shared memory.
+2. **Online softmax**: for each query row the kernel keeps a running maximum `m` and running sum `l`. When a new tile arrives it rescales the partial output by `exp(m_old - m_new)`. The final answer is exact, not an approximation.
+3. **No score matrix**: only the output `O` is allocated, so extra memory is `B·H·N·D·4` bytes.
+4. **Causal mask** (optional): keys after the query are masked, and tiles beyond the diagonal are skipped.
 
 Mapping: one thread owns one query row (its `q` and output accumulators stay in registers). Block sizes are chosen per head size.
 
@@ -50,7 +50,7 @@ Results come from a single Colab session on one T4, so treat small differences a
 2. **Runtime → Change runtime type → T4 GPU → Save.**
 3. **Runtime → Run all.**
 
-The first run compiles the kernel (1–2 minutes). The benchmark then prints a table and saves `results.png`.
+The first run compiles the kernel (1 to 2 minutes). The benchmark then prints a table and saves `results.png`.
 
 Or from any machine with PyTorch and CUDA:
 
@@ -64,9 +64,9 @@ python benchmark.py --dim 128 --sizes 1024 2048
 
 For each sequence length it prints time per call and extra GPU memory for three methods:
 
-- **naive** — textbook attention (builds the full score matrix)
-- **SDPA** — PyTorch's `scaled_dot_product_attention`
-- **ours** — this CUDA kernel
+- **naive**: textbook attention (builds the full score matrix)
+- **SDPA**: PyTorch's `scaled_dot_product_attention`
+- **ours**: this CUDA kernel
 
 It also prints the maximum difference to PyTorch's result and marks it `OK` when below `1e-3`. If a method runs out of GPU memory it prints `OOM`.
 
@@ -95,6 +95,6 @@ It also prints the maximum difference to PyTorch's result and marks it `OK` when
 
 ## Author
 
-Syed Tarteel Ejaz — Lahore, Pakistan
+Syed Tarteel Ejaz, Lahore, Pakistan
 Email: syedtarteelejaz@gmail.com
 GitHub: [SyedTarteelEjaz](https://github.com/SyedTarteelEjaz)
