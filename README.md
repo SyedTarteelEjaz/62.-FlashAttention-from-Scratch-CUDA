@@ -97,4 +97,4 @@ It also prints the maximum difference to PyTorch's result and marks it `OK` when
 
 Syed Tarteel Ejaz — Lahore, Pakistan
 Email: syedtarteelejaz@gmail.com
-GitHub: [19YearsOlds](https://github.com/19YearsOlds)
+GitHub: [SyedTarteelEjaz](https://github.com/SyedTarteelEjaz)
