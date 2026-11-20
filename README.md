@@ -21,18 +21,28 @@ Mapping: one thread owns one query row (its `q` and output accumulators stay in 
 | 64 | 128 | 32 | 16 KB |
 | 128 | 64 | 16 | 16 KB |
 
-## Memory: what to expect
+## Results (Tesla T4, Google Colab)
 
-The score matrix alone, for batch 2 and 8 heads in float32, is `2·8·N²·4` bytes. Our kernel only allocates the output, `2·8·N·64·4` bytes (head size 64).
+Batch 2, 8 heads, head size 64, float32, no mask. Time is the average of 20 calls. "Extra memory" is the peak GPU memory used on top of the inputs. Maximum difference to PyTorch's result is under 1e-6 at every size (marked `OK` by the benchmark).
 
-| N | Naive attention: one N×N matrix | This kernel: output only |
-|---|---|---|
-| 1024 | 64 MiB | 4 MiB |
-| 2048 | 256 MiB | 8 MiB |
-| 4096 | 1,024 MiB | 16 MiB |
-| 8192 | 4,096 MiB | 32 MiB |
+| N | Naive ms | PyTorch SDPA ms | **Ours ms** | Naive extra MB | SDPA extra MB | **Ours extra MB** | Max error |
+|---|---|---|---|---|---|---|---|
+| 512 | 0.705 | 0.813 | **1.094** | 34 | 2 | **2** | 3.6e-07 |
+| 1024 | 2.962 | 2.069 | **2.899** | 132 | 4 | **4** | 3.6e-07 |
+| 2048 | 9.402 | 5.716 | **6.376** | 520 | 8 | **8** | 3.5e-07 |
+| 4096 | 37.124 | 21.436 | **23.011** | 2,064 | 16 | **16** | 6.6e-07 |
 
-Naive attention creates several matrices of this size (scores, masked scores, softmax output), so its real peak is higher. The benchmark measures the actual peak for all three methods.
+### What the numbers show
+
+**Memory.** Naive attention uses memory that grows with the square of the sequence length, from 34 MB at N=512 to 2,064 MB at N=4096. This kernel uses only the output size (2 MB to 16 MB), so it needs **17x less memory at N=512 and 129x less at N=4096**, and the gap keeps widening as N grows.
+
+**Speed against naive attention.** At short sequences the naive version is faster (1.55x at N=512), because the whole score matrix is small and PyTorch's matrix multiplies are very efficient. The two are about equal at N=1024. From N=2048 on, this kernel is faster: **1.47x at N=2048 and 1.61x at N=4096**.
+
+**Speed against PyTorch SDPA.** PyTorch's built-in attention is faster at every size. This kernel runs at about 74%, 71%, 90% and 93% of SDPA speed for N = 512, 1024, 2048 and 4096, so it gets closer as sequences get longer.
+
+**Memory against PyTorch SDPA.** The extra memory is identical (2, 4, 8, 16 MB), because SDPA also uses a fused attention kernel that never builds the full score matrix. The memory saving in this project is therefore against *naive* attention, not against SDPA.
+
+Results come from a single Colab session on one T4, so treat small differences as approximate. N = 8192 was not part of this run.
 
 ## Run it (Google Colab, no setup)
 
@@ -62,10 +72,10 @@ It also prints the maximum difference to PyTorch's result and marks it `OK` when
 
 ## Honest notes
 
-- This is an educational **FP32** kernel with no Tensor Cores and no heavy tuning. PyTorch's built-in kernels are highly optimised, so the goal here is **correctness and memory scaling**, not beating them on speed.
+- This is an educational **FP32** kernel with no Tensor Cores and no heavy tuning. PyTorch's built-in kernels are highly optimised, so the goal here is **correctness and memory scaling**. It matches the numerical result of PyTorch and reaches about 71-93% of SDPA speed in the measured range, but it does not beat it.
 - Forward pass only (no backward pass).
 - Supported: `float32`, head size 32 / 64 / 128, shape `(B, H, N, D)`. Head size 128 needs more registers per thread than the GPU offers, so it likely spills to slower memory and runs slower than 32 and 64.
-- Tested on a Tesla T4 (Google Colab).
+- Results above are from a Tesla T4 on Google Colab, non-causal, single run. The causal mask is implemented but its timings are not reported here.
 
 ## Files
 
